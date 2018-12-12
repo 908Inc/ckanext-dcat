@@ -371,6 +371,7 @@ class DCATRDFHarvester(DCATHarvester):
             return False
 
         try:
+
             dataset = json.loads(harvest_object.content)
 
             # Set default values
@@ -483,6 +484,14 @@ class DCATRDFHarvester(DCATHarvester):
                 package_plugin = lib_plugins.lookup_package_plugin(dataset.get('type', None))
 
                 package_schema = package_plugin.create_package_schema()
+
+                # Deleting extra keys from extras
+                for schema_key in package_schema.keys():
+                    for extra_key in dataset['extras']:
+                        if extra_key.get('key') == schema_key:
+                            dataset[extra_key.get('key')] = extra_key.get('value')
+                            dataset['extras'].remove(extra_key)
+
                 context['schema'] = package_schema
 
                 # We need to explicitly provide a package ID
