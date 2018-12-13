@@ -47,8 +47,8 @@ def datapackage_generate(pkg):
     context = {
         'model': model,
         'session': model.Session,
-        # 'user': c.user,
-        # 'auth_user_obj': c.userobj,
+        'user': c.user,
+        'auth_user_obj': c.userobj,
     }
     pkg_descriptor = {
         'profile': 'data-package',
@@ -350,6 +350,20 @@ class DCATRDFHarvester(DCATHarvester):
         # Nothing to do here
         return True
 
+    def _fix_package_schema(self, dataset):
+        package_plugin = lib_plugins.lookup_package_plugin(dataset.get('type', None))
+
+        package_schema = package_plugin.create_package_schema()
+
+        # Deleting extra keys from extras if extras keys in schema
+        if set([el.get('key') for el in dataset.get('extras', [])]).intersection(set(package_schema.keys())):
+            for schema_key in package_schema.keys():
+                for extra_key in dataset['extras']:
+                    if extra_key.get('key') == schema_key:
+                        dataset[extra_key.get('key')] = extra_key.get('value')
+                        dataset['extras'].remove(extra_key)
+        return dataset
+
     def import_stage(self, harvest_object):
 
         log.debug('In DCATRDFHarvester import_stage')
@@ -433,6 +447,8 @@ class DCATRDFHarvester(DCATHarvester):
                 dataset['name'] = existing_dataset['name']
                 dataset['id'] = existing_dataset['id']
 
+                dataset = self._fix_package_schema(dataset)
+
                 # Set package as public if it exists and was be approved by moderator
                 premoderation_list = dgua_model.DGUAPremoderationLog.get_by_pkg_id(dataset['id'])
 
@@ -481,16 +497,19 @@ class DCATRDFHarvester(DCATHarvester):
                 log.info('Updated dataset %s' % dataset['name'])
 
             else:
+
+                dataset = self._fix_package_schema(dataset)
                 package_plugin = lib_plugins.lookup_package_plugin(dataset.get('type', None))
-
+                #
                 package_schema = package_plugin.create_package_schema()
-
-                # Deleting extra keys from extras
-                for schema_key in package_schema.keys():
-                    for extra_key in dataset['extras']:
-                        if extra_key.get('key') == schema_key:
-                            dataset[extra_key.get('key')] = extra_key.get('value')
-                            dataset['extras'].remove(extra_key)
+                #
+                # Deleting extra keys from extras if extras keys in schema
+                # if set([el.get('key') for el in dataset.get('extras', [])]).intersection(set(package_schema.keys())):
+                #     for schema_key in package_schema.keys():
+                #         for extra_key in dataset['extras']:
+                #             if extra_key.get('key') == schema_key:
+                #                 dataset[extra_key.get('key')] = extra_key.get('value')
+                #                 dataset['extras'].remove(extra_key)
 
                 context['schema'] = package_schema
 
